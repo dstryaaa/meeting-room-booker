@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -65,6 +66,14 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 func GetUserID(ctx context.Context) (int, bool) {
 	userID, ok := ctx.Value(UserIDKEy).(int)
 	return userID, ok
+}
+
+func GetUserIDStr(ctx context.Context) string {
+	userID, ok := GetUserID(ctx)
+	if !ok {
+		return "anonymous"
+	}
+	return fmt.Sprintf("%d", userID)
 }
 
 // GetUserEmail - извлекает Email пользователя из контекста запроса

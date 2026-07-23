@@ -91,17 +91,17 @@ func main() {
 	// 10. Регистрируем эндпоинты
 
 	// Health-check - для мониторинга
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/health", middleware.LoggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"status": "ok",
 			"time":   time.Now().Format(time.RFC3339),
 		})
-	})
+	}))
 
 	// Комнаты - GET запрос без авторизации
 	// (пока что любой может смотреть комнаты)
-	mux.HandleFunc("/rooms", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/rooms", middleware.LoggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Метод не разрешен", http.StatusMethodNotAllowed)
 			return
@@ -136,19 +136,21 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(rooms)
-	})
+	}))
 
 	// Auth эндпоинты
-	mux.HandleFunc("/api/register", authHandler.Register)
-	mux.HandleFunc("/api/login", authHandler.Login)
+	mux.HandleFunc("/api/register", middleware.LoggingMiddleware(authHandler.Register))
+	mux.HandleFunc("/api/login", middleware.LoggingMiddleware(authHandler.Login))
 
 	// Booking эндпоинты
 	mux.HandleFunc("/api/bookings", func(w http.ResponseWriter, r *http.Request) {
+		handler := middleware.LoggingMiddleware
+
 		switch r.Method {
 		case http.MethodGet:
-			middleware.AuthMiddleware(bookingHandler.GetMyBookings)(w, r)
+			handler(middleware.AuthMiddleware(bookingHandler.GetMyBookings))(w, r)
 		case http.MethodPost:
-			middleware.AuthMiddleware(bookingHandler.CreateBooking)(w, r)
+			handler(middleware.AuthMiddleware(bookingHandler.CreateBooking))(w, r)
 		default:
 			http.Error(w, "Метод не разрешен", http.StatusMethodNotAllowed)
 		}
@@ -187,21 +189,26 @@ func main() {
 	// Применяем middleware к хендлеру
 	// Теперь /api/me требует валидный JWT токен
 	mux.HandleFunc("/api/me",
-		middleware.AuthMiddleware(
-			middleware.LoggingMiddleware(meHandler),
-		),
-	)
+		middleware.LoggingMiddleware(
+			middleware.AuthMiddleware(
+				middleware.LoggingMiddleware(meHandler),
+			),
+		))
 
-	fmt.Printf("🚀 Сервер запущен на http://localhost:%s\n", cfg.Port)
-	fmt.Println("📋 Доступные эндпоинты:")
-	fmt.Println("  GET  /health                      - публичный")
-	fmt.Println("  GET  /rooms                      - публичный")
-	fmt.Println("  POST /api/register              - публичный")
-	fmt.Println("  POST /api/login                 - публичный")
-	fmt.Println("  GET  /api/me                    - 🔒 защищенный (требует токен)")
-	fmt.Println()
+	log.Printf("🚀 Сервер запущен на http://localhost:%s", cfg.Port)
+	log.Println("📋 Доступные эндпоинты:")
+	log.Println("  GET  /health                          - публичный")
+	log.Println("  GET  /rooms                          - публичный")
+	log.Println("  POST /api/register                  - публичный")
+	log.Println("  POST /api/login                     - публичный")
+	log.Println("  GET  /api/me                        - 🔒 защищенный")
+	log.Println("  GET  /api/bookings                  - 🔒 мои бронирования")
+	log.Println("  POST /api/bookings                  - 🔒 создать бронирование")
+	log.Println("  DELETE /api/bookings/{id}           - 🔒 отменить бронирование")
+	log.Println("  GET  /api/rooms/{id}/schedule?date= - публичный (расписание)")
 
 	if err := http.ListenAndServe(":"+cfg.Port, mux); err != nil {
 		log.Fatalf("Ошибка запуска сервера: %v", err)
 	}
+
 }
