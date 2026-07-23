@@ -1,0 +1,31 @@
+<form id="create-booking-form">
+    <div class="mb-3">
+        <label class="label">Комната</label>
+        <select name="room_id" class="input-field" required>
+            <option value="">Выберите комнату</option>
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label class="label">Дата</label>
+        <input type="date" name="booking_date" class="input-field" required>
+    </div>
+    
+    <div class="mb-3">
+        <label class="label">Время</label>
+        <select name="start_time" class="input-field" required>
+            <option value="">Выберите время</option>
+        </select>
+        <input type="hidden" name="end_time" value="10:30">
+    </div>
+    
+    <div class="mb-3">
+        <label class="label">Цель</label>
+        <input type="text" name="purpose" class="input-field" required 
+               placeholder="Встреча с командой">
+    </div>
+    
+    <button type="submit" class="btn-primary">
+        📅 Забронировать
+    </button>
+</form>

@@ -90,6 +90,32 @@ func main() {
 
 	// 10. Регистрируем эндпоинты
 
+	// Страница авторизации (без шаблона, отдаем статику)
+	mux.HandleFunc("/auth", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "web/templates/auth.html")
+	})
+
+	// Главная страница
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		http.ServeFile(w, r, "web/templates/index.html")
+	})
+
+	// Дашборд (фрагмент для HTMX)
+	mux.HandleFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		http.ServeFile(w, r, "web/templates/dashboard.html")
+	})
+
+	// Форма бронирования (фрагмент для HTMX)
+	mux.HandleFunc("/booking-form", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		http.ServeFile(w, r, "web/templates/booking-form.html")
+	})
+
 	// Health-check - для мониторинга
 	mux.HandleFunc("/health", middleware.CORS(middleware.LoggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-Type", "application/json")
@@ -101,16 +127,53 @@ func main() {
 
 	// Комнаты - GET запрос без авторизации
 	// (пока что любой может смотреть комнаты)
-	mux.HandleFunc("/rooms", middleware.CORS(middleware.LoggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	// mux.HandleFunc("/rooms", middleware.CORS(middleware.LoggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	// 	if r.Method != http.MethodGet {
+	// 		http.Error(w, "Метод не разрешен", http.StatusMethodNotAllowed)
+	// 		return
+	// 	}
+
+	// 	rows, err := db.QueryContext(r.Context(), `
+	// 		SELECT id, name, capacity, description, has_projector, has_whiteboard, is_active
+	// 		FROM rooms WHERE is_active = true
+	// 	`)
+	// 	if err != nil {
+	// 		log.Printf("❌ Ошибка запроса к БД: %v", err)
+	// 		http.Error(w, "Ошибка БД", http.StatusInternalServerError)
+	// 		return
+	// 	}
+	// 	defer rows.Close()
+
+	// 	var rooms []models.Room
+	// 	for rows.Next() {
+	// 		var room models.Room
+	// 		err := rows.Scan(
+	// 			&room.ID, &room.Name, &room.Capacity,
+	// 			&room.Description, &room.HasProjector,
+	// 			&room.HasWhiteboard, &room.IsActive,
+	// 		)
+	// 		if err != nil {
+	// 			log.Printf("❌ Ошибка сканирования: %v", err)
+	// 			http.Error(w, "ошибка чтения данных", http.StatusInternalServerError)
+	// 			return
+	// 		}
+	// 		rooms = append(rooms, room)
+	// 	}
+
+	// 	w.Header().Set("Content-Type", "application/json")
+	// 	json.NewEncoder(w).Encode(rooms)
+	// })))
+
+	roomsHandler := middleware.CORS(middleware.LoggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Метод не разрешен", http.StatusMethodNotAllowed)
 			return
 		}
 
 		rows, err := db.QueryContext(r.Context(), `
-			SELECT id, name, capacity, description, has_projector, has_whiteboard, is_active 
-			FROM rooms WHERE is_active = true
-		`)
+        SELECT id, name, capacity, description, has_projector, has_whiteboard, is_active 
+        FROM rooms WHERE is_active = true
+    `)
 		if err != nil {
 			log.Printf("❌ Ошибка запроса к БД: %v", err)
 			http.Error(w, "Ошибка БД", http.StatusInternalServerError)
@@ -136,7 +199,10 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(rooms)
-	})))
+	}))
+
+	mux.HandleFunc("/rooms", roomsHandler)
+	mux.HandleFunc("/api/rooms", roomsHandler)
 
 	// Auth эндпоинты
 	mux.HandleFunc("/api/register", middleware.CORS(middleware.LoggingMiddleware(authHandler.Register)))
@@ -200,6 +266,85 @@ func main() {
 				middleware.LoggingMiddleware(meHandler),
 			),
 		))
+
+	// HTMX эндпоинт для логина (возвращает HTML-фрагмент, а не JSON)
+	mux.HandleFunc("/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		// Парсим форму
+		email := r.FormValue("email")
+		password := r.FormValue("password")
+
+		// Создаем запрос к сервису
+		req := &models.LoginRequest{
+			Email:    email,
+			Password: password,
+		}
+
+		resp, err := authService.Login(r.Context(), req)
+		if err != nil {
+			// Возвращаем HTML с ошибкой
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">Неверный email или пароль</div>`))
+			return
+		}
+
+		// Возвращаем HTML с токеном (для JavaScript)
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		// Отдаем HTML, который сохранит токен и перенаправит
+		w.Write([]byte(`
+        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">Успешный вход!</div>
+        <script>
+            localStorage.setItem('token', '` + resp.Token + `');
+            localStorage.setItem('user_id', '` + string(rune(resp.UserID)) + `');
+            localStorage.setItem('user_name', '` + resp.FullName + `');
+            window.location.href = '/';
+        </script>
+    `))
+	})
+
+	// HTMX эндпоинт для регистрации
+	mux.HandleFunc("/auth/register", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		email := r.FormValue("email")
+		password := r.FormValue("password")
+		fullName := r.FormValue("full_name")
+
+		req := &models.RegisterRequest{
+			Email:    email,
+			Password: password,
+			FullName: fullName,
+		}
+
+		resp, err := authService.Register(r.Context(), req)
+		if err != nil {
+			w.Header().Set("Content-Type", "text/html")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">` + err.Error() + `</div>`))
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`
+        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">Регистрация успешна!</div>
+        <script>
+            localStorage.setItem('token', '` + resp.Token + `');
+            localStorage.setItem('user_id', '` + string(rune(resp.UserID)) + `');
+            localStorage.setItem('user_name', '` + resp.FullName + `');
+            window.location.href = '/';
+        </script>
+    `))
+	})
 
 	log.Printf("🚀 Сервер запущен на http://localhost:%s", cfg.Port)
 	log.Println("📋 Доступные эндпоинты:")

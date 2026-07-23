@@ -1,0 +1,46 @@
+/* Это минимальный набор стилей для Tailwind */
+/* В реальном проекте ты бы использовал CDN */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Дополнительные кастомные стили */
+body {
+    @apply bg-gray-100 min-h-screen;
+}
+
+.container-custom {
+    @apply max-w-4xl mx-auto p-4;
+}
+
+.card {
+    @apply bg-white rounded-lg shadow-md p-6 mb-6;
+}
+
+.btn-primary {
+    @apply bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded transition;
+}
+
+.btn-danger {
+    @apply bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded transition;
+}
+
+.btn-outline {
+    @apply border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded transition;
+}
+
+.input-field {
+    @apply w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500;
+}
+
+.label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+}
+
+.slot-free {
+    @apply bg-green-100 hover:bg-green-200 text-green-800 cursor-pointer rounded p-2 text-center transition;
+}
+
+.slot-booked {
+    @apply bg-red-100 text-red-600 rounded p-2 text-center opacity-50;
+}

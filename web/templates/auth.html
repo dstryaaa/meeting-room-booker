@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meeting Room Booker - Вход</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+        <h1 class="text-2xl font-bold text-center text-gray-800 mb-6">
+            📅 Meeting Room Booker
+        </h1>
+
+        <div id="error-message" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <span id="error-text"></span>
+        </div>
+
+        <!-- Форма входа -->
+        <div id="login-form">
+            <h2 class="text-lg font-semibold text-gray-700 mb-4">Вход</h2>
+            <form hx-post="/auth/login" 
+                  hx-target="#error-message" 
+                  hx-swap="innerHTML"
+                  hx-on::after-request="handleLoginResponse(event)">
+                <div class="mb-4">
+                    <label class="label">Email</label>
+                    <input type="email" name="email" required class="input-field" placeholder="alice@example.com">
+                </div>
+                <div class="mb-4">
+                    <label class="label">Пароль</label>
+                    <input type="password" name="password" required class="input-field" placeholder="password123">
+                </div>
+                <button type="submit" class="btn-primary w-full">
+                    Войти
+                </button>
+            </form>
+            <p class="text-center text-sm text-gray-600 mt-4">
+                Нет аккаунта? 
+                <a href="#" onclick="showRegister()" class="text-blue-500 hover:underline">Зарегистрироваться</a>
+            </p>
+        </div>
+
+        <!-- Форма регистрации -->
+        <div id="register-form" class="hidden">
+            <h2 class="text-lg font-semibold text-gray-700 mb-4">Регистрация</h2>
+            <form hx-post="/auth/register" 
+                  hx-target="#error-message" 
+                  hx-swap="innerHTML"
+                  hx-on::after-request="handleRegisterResponse(event)">
+                <div class="mb-4">
+                    <label class="label">Имя</label>
+                    <input type="text" name="full_name" required class="input-field" placeholder="Иван Иванов">
+                </div>
+                <div class="mb-4">
+                    <label class="label">Email</label>
+                    <input type="email" name="email" required class="input-field" placeholder="ivan@example.com">
+                </div>
+                <div class="mb-4">
+                    <label class="label">Пароль</label>
+                    <input type="password" name="password" required class="input-field" placeholder="минимум 6 символов">
+                </div>
+                <button type="submit" class="btn-primary w-full">
+                    Зарегистрироваться
+                </button>
+            </form>
+            <p class="text-center text-sm text-gray-600 mt-4">
+                Уже есть аккаунт? 
+                <a href="#" onclick="showLogin()" class="text-blue-500 hover:underline">Войти</a>
+            </p>
+        </div>
+
+        <p class="text-center text-xs text-gray-400 mt-6">
+            Тестовые пользователи: alice@example.com / password123
+        </p>
+    </div>
+
+    <style>
+        .label { display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem; }
+        .input-field { width: 100%; border: 1px solid #d1d5db; border-radius: 0.375rem; padding: 0.5rem 0.75rem; outline: none; }
+        .input-field:focus { outline: none; ring: 2px solid #3b82f6; }
+        .btn-primary { width: 100%; background-color: #3b82f6; color: white; font-weight: 500; padding: 0.5rem 1rem; border-radius: 0.375rem; transition: 0.2s; }
+        .btn-primary:hover { background-color: #2563eb; }
+    </style>
+
+    <script>
+        function showRegister() {
+            document.getElementById('login-form').classList.add('hidden');
+            document.getElementById('register-form').classList.remove('hidden');
+            document.getElementById('error-message').classList.add('hidden');
+        }
+
+        function showLogin() {
+            document.getElementById('register-form').classList.add('hidden');
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('error-message').classList.add('hidden');
+        }
+
+        function handleLoginResponse(event) {
+            const responseText = event.detail.xhr.responseText;
+            
+            // Если это успешный вход
+            if (responseText.includes('localStorage.setItem')) {
+                // Извлекаем скрипт из ответа
+                const scriptMatch = responseText.match(/<script>([\s\S]*?)<\/script>/);
+                if (scriptMatch) {
+                    eval(scriptMatch[1]);
+                }
+            }
+        }
+
+        function handleRegisterResponse(event) {
+            const responseText = event.detail.xhr.responseText;
+            
+            if (responseText.includes('localStorage.setItem')) {
+                const scriptMatch = responseText.match(/<script>([\s\S]*?)<\/script>/);
+                if (scriptMatch) {
+                    eval(scriptMatch[1]);
+                }
+            }
+        }
+
+        if (localStorage.getItem('token')) {
+            window.location.href = '/';
+        }
+    </script>
+</body>
+</html>
