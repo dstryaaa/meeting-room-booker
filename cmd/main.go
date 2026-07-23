@@ -148,9 +148,9 @@ func main() {
 
 		switch r.Method {
 		case http.MethodGet:
-			handler(middleware.AuthMiddleware(bookingHandler.GetMyBookings))(w, r)
+			middleware.AuthMiddleware(handler(bookingHandler.GetMyBookings))(w, r)
 		case http.MethodPost:
-			handler(middleware.AuthMiddleware(bookingHandler.CreateBooking))(w, r)
+			middleware.AuthMiddleware(handler(bookingHandler.CreateBooking))(w, r)
 		default:
 			http.Error(w, "Метод не разрешен", http.StatusMethodNotAllowed)
 		}
