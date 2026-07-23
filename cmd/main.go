@@ -91,17 +91,17 @@ func main() {
 	// 10. Регистрируем эндпоинты
 
 	// Health-check - для мониторинга
-	mux.HandleFunc("/health", middleware.LoggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/health", middleware.CORS(middleware.LoggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"status": "ok",
 			"time":   time.Now().Format(time.RFC3339),
 		})
-	}))
+	})))
 
 	// Комнаты - GET запрос без авторизации
 	// (пока что любой может смотреть комнаты)
-	mux.HandleFunc("/rooms", middleware.LoggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/rooms", middleware.CORS(middleware.LoggingMiddleware(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Метод не разрешен", http.StatusMethodNotAllowed)
 			return
@@ -136,14 +136,14 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(rooms)
-	}))
+	})))
 
 	// Auth эндпоинты
-	mux.HandleFunc("/api/register", middleware.LoggingMiddleware(authHandler.Register))
-	mux.HandleFunc("/api/login", middleware.LoggingMiddleware(authHandler.Login))
+	mux.HandleFunc("/api/register", middleware.CORS(middleware.LoggingMiddleware(authHandler.Register)))
+	mux.HandleFunc("/api/login", middleware.CORS(middleware.LoggingMiddleware(authHandler.Login)))
 
 	// Booking эндпоинты
-	mux.HandleFunc("/api/bookings", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/bookings", middleware.CORS(func(w http.ResponseWriter, r *http.Request) {
 		handler := middleware.LoggingMiddleware
 
 		switch r.Method {
@@ -154,18 +154,24 @@ func main() {
 		default:
 			http.Error(w, "Метод не разрешен", http.StatusMethodNotAllowed)
 		}
-	})
+	}))
 
-	mux.HandleFunc("/api/bookings/", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/bookings/", middleware.CORS(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
-			middleware.AuthMiddleware(bookingHandler.CancelBooking)(w, r)
+			middleware.AuthMiddleware(
+				middleware.LoggingMiddleware(bookingHandler.CancelBooking),
+			)(w, r)
 		} else {
 			http.Error(w, "Метод не разрешен", http.StatusMethodNotAllowed)
 		}
-	})
+	}))
 
 	// Публичный эндпоинт для расписания (можно смотреть без авторизации)
-	mux.HandleFunc("/api/rooms/", bookingHandler.GetSchedule) // GET /api/rooms/{id}/schedule
+	mux.HandleFunc("/api/rooms/",
+		middleware.CORS(
+			middleware.LoggingMiddleware(bookingHandler.GetSchedule), // GET /api/rooms/{id}/schedule\
+		),
+	)
 
 	meHandler := func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
@@ -189,7 +195,7 @@ func main() {
 	// Применяем middleware к хендлеру
 	// Теперь /api/me требует валидный JWT токен
 	mux.HandleFunc("/api/me",
-		middleware.LoggingMiddleware(
+		middleware.CORS(
 			middleware.AuthMiddleware(
 				middleware.LoggingMiddleware(meHandler),
 			),
